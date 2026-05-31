@@ -5,12 +5,18 @@ const path = require('path');
 const os = require('os');
 
 function getClient() {
-  return new TwitterApi({
-    appKey: process.env.TWITTER_API_KEY,
-    appSecret: process.env.TWITTER_API_SECRET,
-    accessToken: process.env.TWITTER_ACCESS_TOKEN,
-    accessSecret: process.env.TWITTER_ACCESS_SECRET,
-  });
+  const appKey    = (process.env.TWITTER_API_KEY       || '').trim();
+  const appSecret = (process.env.TWITTER_API_SECRET    || '').trim();
+  const accessToken  = (process.env.TWITTER_ACCESS_TOKEN  || '').trim();
+  const accessSecret = (process.env.TWITTER_ACCESS_SECRET || '').trim();
+
+  console.log('[Twitter] OAuth 1.0a key check:');
+  console.log('  TWITTER_API_KEY        :', appKey.substring(0, 4)       || '(vazio)');
+  console.log('  TWITTER_API_SECRET     :', appSecret.substring(0, 4)    || '(vazio)');
+  console.log('  TWITTER_ACCESS_TOKEN   :', accessToken.substring(0, 4)  || '(vazio)');
+  console.log('  TWITTER_ACCESS_SECRET  :', accessSecret.substring(0, 4) || '(vazio)');
+
+  return new TwitterApi({ appKey, appSecret, accessToken, accessSecret });
 }
 
 async function downloadImage(url) {
