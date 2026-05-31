@@ -69,7 +69,7 @@ Retorne APENAS o texto do tweet, sem aspas, sem explicações, sem prefixos.`
 }
 
 async function generateImage(tweetText) {
-  const imagePrompt = `Create a clean data visualization or infographic that illustrates the economic concept in this text: "${tweetText}". Style: minimalist chart or graph with a dark background (#0d0d0d), sharp white or red lines, no decorative elements. Could be a bar chart, line chart, or simple table showing real numbers. No people, no faces, no stock photos. No watermarks. The visual should feel like a Bloomberg terminal screenshot or a central bank report — cold, factual, serious. If the text mentions specific numbers or percentages, incorporate them visually. Labels in Portuguese (Brazil). No title bar, no axis labels beyond the data itself.`;
+  const imagePrompt = `Infographic data visualization. Dark background #0A0A0A. Based on this economic post in Portuguese: "${tweetText}". Instructions: extract the key numbers, percentages or comparisons from the text and represent them visually as a chart or infographic. Use bar chart, line chart, or comparison table depending on what fits the data. Typography: clean sans-serif, white labels, numbers in large bold type. Accent colors: white for neutral data, #1D9BF0 blue for highlights, red (#FF4444) for negative or alarming values. Style: Bloomberg terminal, financial dashboard, central bank report — cold, minimal, data-first. No people, no faces, no human figures, no illustrations, no decorative icons. No watermarks, no borders, no gradients. The numbers from the post must appear prominently in the image. Labels and data in Portuguese (Brazil).`;
 
   const response = await client.images.generate({
     model: 'gpt-image-1',
