@@ -1,34 +1,52 @@
 #!/usr/bin/env python3
 """
-LUCAS — Script de publicação no Twitter/X via Tweepy (API v2).
-Chamado pelo Node.js via spawn de processo.
+LUCAS — Publicação no Twitter/X via chamadas diretas à API v2.
+Usa requests + requests-oauthlib. Sem Tweepy, sem imghdr.
 Saída: JSON em stdout.
 """
 
 import sys
 import os
 import json
-import tweepy
+import requests
+from requests_oauthlib import OAuth1Session
 
 
-def get_client():
-    return tweepy.Client(
-        consumer_key=os.environ["TWITTER_API_KEY"],
-        consumer_secret=os.environ["TWITTER_API_SECRET"],
-        access_token=os.environ["TWITTER_ACCESS_TOKEN"],
-        access_token_secret=os.environ["TWITTER_ACCESS_SECRET"],
+def make_oauth() -> OAuth1Session:
+    return OAuth1Session(
+        client_key=os.environ["TWITTER_API_KEY"],
+        client_secret=os.environ["TWITTER_API_SECRET"],
+        resource_owner_key=os.environ["TWITTER_ACCESS_TOKEN"],
+        resource_owner_secret=os.environ["TWITTER_ACCESS_SECRET"],
     )
 
 
-def get_api_v1():
-    """API v1.1 necessária apenas para upload de mídia."""
-    auth = tweepy.OAuth1UserHandler(
-        os.environ["TWITTER_API_KEY"],
-        os.environ["TWITTER_API_SECRET"],
-        os.environ["TWITTER_ACCESS_TOKEN"],
-        os.environ["TWITTER_ACCESS_SECRET"],
+def upload_media(oauth: OAuth1Session, image_path: str) -> str:
+    """Upload de imagem via API v1.1 (único endpoint que aceita mídia)."""
+    with open(image_path, "rb") as f:
+        resp = oauth.post(
+            "https://upload.twitter.com/1.1/media/upload.json",
+            files={"media": f},
+        )
+    if resp.status_code not in (200, 201):
+        raise RuntimeError(f"Falha no upload de mídia ({resp.status_code}): {resp.text}")
+    return resp.json()["media_id_string"]
+
+
+def post_tweet(oauth: OAuth1Session, text: str, media_id: str | None = None) -> str:
+    """Posta tweet via API v2. Retorna o ID do tweet."""
+    payload = {"text": text}
+    if media_id:
+        payload["media"] = {"media_ids": [media_id]}
+
+    resp = oauth.post(
+        "https://api.twitter.com/2/tweets",
+        json=payload,
     )
-    return tweepy.API(auth)
+    if resp.status_code not in (200, 201):
+        raise RuntimeError(f"Falha ao postar tweet ({resp.status_code}): {resp.text}")
+
+    return resp.json()["data"]["id"]
 
 
 def main():
@@ -39,20 +57,9 @@ def main():
     text = sys.argv[1]
     image_path = sys.argv[2] if len(sys.argv) > 2 else None
 
-    client = get_client()
-    media_ids = None
-
-    if image_path:
-        api_v1 = get_api_v1()
-        media = api_v1.media_upload(filename=image_path)
-        media_ids = [media.media_id]
-
-    kwargs = {"text": text}
-    if media_ids:
-        kwargs["media_ids"] = media_ids
-
-    response = client.create_tweet(**kwargs)
-    tweet_id = response.data["id"]
+    oauth = make_oauth()
+    media_id = upload_media(oauth, image_path) if image_path else None
+    tweet_id = post_tweet(oauth, text, media_id)
 
     print(json.dumps({"tweetId": tweet_id, "text": text}))
 
@@ -60,9 +67,6 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except tweepy.TweepyException as e:
-        print(json.dumps({"error": f"Tweepy error: {str(e)}"}))
-        sys.exit(1)
     except Exception as e:
         print(json.dumps({"error": str(e)}))
         sys.exit(1)

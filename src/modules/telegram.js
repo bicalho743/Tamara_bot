@@ -1,6 +1,6 @@
 const TelegramBot = require('node-telegram-bot-api');
 const { v4: uuidv4 } = require('uuid');
-const { generatePostDraft, generateImage } = require('./openai');
+const { generatePostDraft, generateImage, generateReply } = require('./openai');
 const { saveDraft, getDraft, setSession, getSession, clearSession, markPosted } = require('./db');
 const { postTweet } = require('./twitter');
 
@@ -33,6 +33,12 @@ async function handleMessage(msg) {
     return;
   }
 
+  if (text.toUpperCase().startsWith('REPLY:')) {
+    const originalPost = text.slice(6).trim();
+    if (!originalPost) return bot.sendMessage(chatId, 'Envie o post original após "REPLY:".');
+    return handleReplyMode(chatId, originalPost);
+  }
+
   setSession(chatId, { state: 'generating', rawInput: text });
 
   await bot.sendMessage(chatId, 'Processando. Aguarde...');
@@ -44,7 +50,7 @@ async function handleMessage(msg) {
     saveDraft({ id, rawInput: text, text: draft, imageUrl: null });
     setSession(chatId, { state: 'awaiting_action', currentDraftId: id });
 
-    await bot.sendMessage(chatId, `*RASCUNHO LUCAS:*\n\n${draft}\n\n_(${draft.length}/280 chars)_`, {
+    await bot.sendMessage(chatId, `*RASCUNHO LUCAS:*\n\n${draft}\n\n_(${draft.length}/500 chars)_`, {
       parse_mode: 'Markdown',
       reply_markup: buildKeyboard(id, false)
     });
@@ -79,6 +85,16 @@ async function handleCallbackQuery(query) {
     const id = data.split(':')[1];
     setSession(chatId, { state: 'editing', currentDraftId: id });
     await bot.sendMessage(chatId, 'Envie o texto editado agora:');
+  } else if (data.startsWith('copy_reply:')) {
+    const id = data.split(':')[1];
+    const draft = getDraft(id);
+    if (!draft) return bot.sendMessage(chatId, 'Reply não encontrado.');
+    await bot.sendMessage(chatId, draft.text);
+  } else if (data.startsWith('regen_reply:')) {
+    const id = data.split(':')[1];
+    const draft = getDraft(id);
+    if (!draft) return bot.sendMessage(chatId, 'Draft não encontrado.');
+    await handleReplyMode(chatId, draft.rawInput);
   }
 }
 
@@ -148,10 +164,46 @@ function buildKeyboard(draftId, hasImage) {
   return { inline_keyboard: rows };
 }
 
+async function handleReplyMode(chatId, originalPost) {
+  setSession(chatId, { state: 'generating_reply', originalPost });
+  await bot.sendMessage(chatId, 'Gerando reply. Aguarde...');
+
+  try {
+    const replyText = await generateReply(originalPost);
+    const id = uuidv4();
+
+    saveDraft({ id, type: 'reply', rawInput: originalPost, text: replyText });
+    setSession(chatId, { state: 'awaiting_reply_action', currentDraftId: id });
+
+    await bot.sendMessage(
+      chatId,
+      `*REPLY LUCAS:*\n\n${replyText}\n\n_(${replyText.length}/200 chars)_`,
+      {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: 'Copiar Reply', callback_data: `copy_reply:${id}` },
+              { text: 'Gerar Outro', callback_data: `regen_reply:${id}` }
+            ],
+            [
+              { text: 'Ignorar', callback_data: `ignore:${id}` }
+            ]
+          ]
+        }
+      }
+    );
+  } catch (err) {
+    console.error('[handleReplyMode] Erro:', err.message);
+    await bot.sendMessage(chatId, `Erro ao gerar reply: ${err.message}`);
+    clearSession(chatId);
+  }
+}
+
 async function sendHelp(chatId) {
   await bot.sendMessage(
     chatId,
-    '*LUCAS — Agente de Conteúdo*\n\nEnvie qualquer tema ou ideia bruta. Eu gero o tweet.\n\n`/status` — situação atual\n`/start` — esta mensagem',
+    '*LUCAS — Agente de Conteúdo*\n\nEnvie qualquer tema ou ideia bruta. Eu gero o tweet.\n\n*Modo REPLY:* envie `REPLY: <texto do post>` para gerar um reply provocador.\n\n`/status` — situação atual\n`/start` — esta mensagem',
     { parse_mode: 'Markdown' }
   );
 }

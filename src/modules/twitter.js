@@ -1,57 +1,15 @@
-const { spawn } = require('child_process');
-const path = require('path');
+const { TwitterApi } = require('twitter-api-v2');
 const axios = require('axios');
 const fs = require('fs');
+const path = require('path');
 const os = require('os');
 
-const PYTHON_SCRIPT = path.join(__dirname, '../../scripts/post_tweet.py');
-
-async function postTweet(text, imageUrl = null) {
-  let imagePath = null;
-
-  if (imageUrl) {
-    imagePath = await downloadImage(imageUrl);
-  }
-
-  return new Promise((resolve, reject) => {
-    const args = [PYTHON_SCRIPT, text];
-    if (imagePath) args.push(imagePath);
-
-    const env = {
-      ...process.env,
-      TWITTER_API_KEY: process.env.TWITTER_API_KEY,
-      TWITTER_API_SECRET: process.env.TWITTER_API_SECRET,
-      TWITTER_ACCESS_TOKEN: process.env.TWITTER_ACCESS_TOKEN,
-      TWITTER_ACCESS_SECRET: process.env.TWITTER_ACCESS_SECRET
-    };
-
-    const proc = spawn('python', args, { env });
-
-    let stdout = '';
-    let stderr = '';
-
-    proc.stdout.on('data', d => { stdout += d.toString(); });
-    proc.stderr.on('data', d => { stderr += d.toString(); });
-
-    proc.on('close', code => {
-      if (imagePath) {
-        try { fs.unlinkSync(imagePath); } catch {}
-      }
-
-      if (code !== 0) {
-        return reject(new Error(`Python script falhou (código ${code}): ${stderr.trim()}`));
-      }
-
-      try {
-        const result = JSON.parse(stdout.trim());
-        if (result.error) return reject(new Error(result.error));
-        resolve(result);
-      } catch {
-        reject(new Error(`Resposta inválida do script: ${stdout.trim()}`));
-      }
-    });
-
-    proc.on('error', err => reject(new Error(`Falha ao chamar Python: ${err.message}`)));
+function getClient() {
+  return new TwitterApi({
+    appKey: process.env.TWITTER_API_KEY,
+    appSecret: process.env.TWITTER_API_SECRET,
+    accessToken: process.env.TWITTER_ACCESS_TOKEN,
+    accessSecret: process.env.TWITTER_ACCESS_SECRET,
   });
 }
 
@@ -60,6 +18,27 @@ async function downloadImage(url) {
   const response = await axios.get(url, { responseType: 'arraybuffer' });
   fs.writeFileSync(tmpPath, response.data);
   return tmpPath;
+}
+
+async function postTweet(text, imageUrl = null) {
+  const client = getClient();
+  let tmpPath = null;
+
+  try {
+    if (imageUrl) {
+      tmpPath = await downloadImage(imageUrl);
+      const mediaId = await client.v1.uploadMedia(tmpPath, { mimeType: 'image/png' });
+      const { data } = await client.v2.tweet({ text, media: { media_ids: [mediaId] } });
+      return { tweetId: data.id, text };
+    }
+
+    const { data } = await client.v2.tweet(text);
+    return { tweetId: data.id, text };
+  } finally {
+    if (tmpPath) {
+      try { fs.unlinkSync(tmpPath); } catch {}
+    }
+  }
 }
 
 module.exports = { postTweet };
