@@ -1,4 +1,7 @@
 const OpenAI = require('openai');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -69,14 +72,17 @@ async function generateImage(tweetText) {
   const imagePrompt = `Fotografia realista, estilo UGC orgânico. Homem brasileiro de 35-45 anos, bem-sucedido, aparência séria e confiante, camisa social ou polo, em home office moderno ou café executivo discreto. Sem texto na imagem. Sem elementos genéricos de "sucesso". Iluminação natural. Composição casual como se fosse uma foto tirada no cotidiano. A cena transmite: "esse cara sabe o que está falando e não precisa impressionar ninguém". Contexto visual neutro que complementa análise econômica fria.`;
 
   const response = await client.images.generate({
-    model: 'dall-e-3',
+    model: 'gpt-image-1',
     prompt: imagePrompt,
     n: 1,
     size: '1024x1024',
-    quality: 'hd'
+    quality: 'high'
   });
 
-  return response.data[0].url;
+  const b64 = response.data[0].b64_json;
+  const tmpPath = path.join(os.tmpdir(), `lucas_img_${Date.now()}.png`);
+  fs.writeFileSync(tmpPath, Buffer.from(b64, 'base64'));
+  return tmpPath;
 }
 
 const LUCAS_REPLY_PROMPT = `Você é LUCAS. Economista cínico. Você acabou de ler um post no X e vai responder.

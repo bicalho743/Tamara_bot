@@ -32,7 +32,7 @@ async function postTweet(text, imageUrl = null) {
 
   try {
     if (imageUrl) {
-      tmpPath = await downloadImage(imageUrl);
+      tmpPath = fs.existsSync(imageUrl) ? imageUrl : await downloadImage(imageUrl);
       const mediaId = await client.v1.uploadMedia(tmpPath, { mimeType: 'image/png' });
       const { data } = await client.v2.tweet({ text, media: { media_ids: [mediaId] } });
       return { tweetId: data.id, text };
