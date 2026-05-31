@@ -69,7 +69,7 @@ Retorne APENAS o texto do tweet, sem aspas, sem explicações, sem prefixos.`
 }
 
 async function generateImage(tweetText) {
-  const imagePrompt = `Fotografia realista, estilo UGC orgânico. Homem brasileiro de 35-45 anos, bem-sucedido, aparência séria e confiante, camisa social ou polo, em home office moderno ou café executivo discreto. Sem texto na imagem. Sem elementos genéricos de "sucesso". Iluminação natural. Composição casual como se fosse uma foto tirada no cotidiano. A cena transmite: "esse cara sabe o que está falando e não precisa impressionar ninguém". Contexto visual neutro que complementa análise econômica fria.`;
+  const imagePrompt = `Create a clean data visualization or infographic that illustrates the economic concept in this text: "${tweetText}". Style: minimalist chart or graph with a dark background (#0d0d0d), sharp white or red lines, no decorative elements. Could be a bar chart, line chart, or simple table showing real numbers. No people, no faces, no stock photos. No watermarks. The visual should feel like a Bloomberg terminal screenshot or a central bank report — cold, factual, serious. If the text mentions specific numbers or percentages, incorporate them visually. Labels in Portuguese (Brazil). No title bar, no axis labels beyond the data itself.`;
 
   const response = await client.images.generate({
     model: 'gpt-image-1',
