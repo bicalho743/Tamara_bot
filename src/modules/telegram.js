@@ -9,21 +9,25 @@ let bot;
 const ALLOWED_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
 async function startBot() {
-  bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: false });
-
-  await bot.deleteWebhook({ drop_pending_updates: true });
+  bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, {
+    polling: {
+      interval: 3000,
+      autoStart: true,
+      params: { timeout: 10, allowed_updates: ['message', 'callback_query'] }
+    }
+  });
 
   bot.on('message', handleMessage);
   bot.on('callback_query', handleCallbackQuery);
-  bot.on('polling_error', err => console.error('[Telegram] Polling error:', err.message));
+  bot.on('polling_error', (err) => {
+    console.error('[Telegram] Polling error:', err.message);
+    if (err.message && err.message.includes('409')) {
+      console.log('[Telegram] Conflito 409 detectado — aguardando 15s para retry...');
+    }
+  });
 
-  await bot.startPolling();
   console.log('[Telegram] Listeners registrados');
 }
-function isAuthorized(chatId) {
-  return String(chatId) === String(ALLOWED_CHAT_ID);
-}
-
 async function handleMessage(msg) {
   const chatId = msg.chat.id;
   if (!isAuthorized(chatId)) return;
