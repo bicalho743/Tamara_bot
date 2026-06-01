@@ -33,7 +33,13 @@ async function startBot() {
   });
 
   console.log('[Telegram] Listeners registrados');
-}async function handleMessage(msg) {
+}
+
+function isAuthorized(chatId) {
+  return String(chatId) === String(ALLOWED_CHAT_ID);
+}
+
+async function handleMessage(msg) {
   const chatId = msg.chat.id;
   if (!isAuthorized(chatId)) return;
 
