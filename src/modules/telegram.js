@@ -67,7 +67,7 @@ async function handleMessage(msg) {
     saveDraft({ id, rawInput: text, text: draft, imageUrl: null });
     setSession(chatId, { state: 'awaiting_action', currentDraftId: id });
 
-    await bot.sendMessage(chatId, `*RASCUNHO LUCAS:*\n\n${draft}\n\n_(${draft.length}/500 chars)_`, {
+    await bot.sendMessage(chatId, `*RASCUNHO TÂMARA:*\n\n${draft}\n\n_(${draft.length}/500 chars)_`, {
       parse_mode: 'Markdown',
       reply_markup: buildKeyboard(id, false)
     });
@@ -194,7 +194,7 @@ async function handleReplyMode(chatId, originalPost) {
 
     await bot.sendMessage(
       chatId,
-      `*REPLY LUCAS:*\n\n${replyText}\n\n_(${replyText.length}/200 chars)_`,
+      `*REPLY TÂMARA:*\n\n${replyText}\n\n_(${replyText.length}/200 chars)_`,
       {
         parse_mode: 'Markdown',
         reply_markup: {
@@ -220,7 +220,7 @@ async function handleReplyMode(chatId, originalPost) {
 async function sendHelp(chatId) {
   await bot.sendMessage(
     chatId,
-    '*LUCAS — Agente de Conteúdo*\n\nEnvie qualquer tema ou ideia bruta. Eu gero o tweet.\n\n*Modo REPLY:* envie `REPLY: <texto do post>` para gerar um reply provocador.\n\n`/status` — situação atual\n`/start` — esta mensagem',
+    '*Tâmara  — Agente de Conteúdo*\n\nEnvie qualquer tema ou ideia bruta. Eu gero o tweet.\n\n*Modo REPLY:* envie `REPLY: <texto do post>` para gerar um reply provocador.\n\n`/status` — situação atual\n`/start` — esta mensagem',
     { parse_mode: 'Markdown' }
   );
 }
