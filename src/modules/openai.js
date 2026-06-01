@@ -113,12 +113,13 @@ async function generatePostFromProduct(amazonUrl) {
 ${productContext}
 
 INSTRUÇÕES:
-- Crie uma dica de organização relacionada ao produto
-- Mencione o produto naturalmente no final
+- Escreva uma dica de organização inspirada no tipo de produto
+- NUNCA cite o nome da marca, nome do produto ou modelo
+- NUNCA faça propaganda explícita — a dica deve parecer orgânica
+- O produto aparece como solução natural da dica, não como anúncio
 - NÃO coloque o link no texto — ele será adicionado automaticamente
 - Máximo 400 caracteres
-- Retorne APENAS o texto do post, sem aspas, sem explicações`
-      }
+- Retorne APENAS o texto do post, sem aspas, sem explicações, sem prefixos      }
     ],
     max_tokens: 300,
     temperature: 0.85
