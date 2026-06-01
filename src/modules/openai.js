@@ -2,6 +2,7 @@ const OpenAI = require('openai');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const axios = require('axios');
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -41,11 +42,12 @@ Com ela funcionando, o resto da bagunça fica suportável.
 Priorize o que faz a casa funcionar."
 
 FORMATO:
-- Máximo 500 caracteres no total
+- Máximo 460 caracteres no total (reserva espaço para o link)
 - Sem introdução. Começa direto na dica ou no problema
 - Sem "Thread:", "1/", fio, ou convite a engajamento
 - Quando sugerir produto: mencionar naturalmente no final, nunca forçado`;
 
+// ─── Gera post de dica de organização ────────────────────────────────────────
 async function generatePostDraft(rawInput) {
   const response = await client.chat.completions.create({
     model: 'gpt-4o',
@@ -55,7 +57,7 @@ async function generatePostDraft(rawInput) {
         role: 'user',
         content: `Escreva um post para X/Twitter no estilo TÂMARA CAVALCANTE.
 
-Tema/Input: "${rawInput}"
+Tema: "${rawInput}"
 
 Retorne APENAS o texto do post, sem aspas, sem explicações, sem prefixos.`
       }
@@ -65,11 +67,73 @@ Retorne APENAS o texto do post, sem aspas, sem explicações, sem prefixos.`
   });
 
   const text = response.choices[0].message.content.trim();
-  return text.length > 500 ? text.substring(0, 497) + '...' : text;
+  return text.length > 460 ? text.substring(0, 457) + '...' : text;
 }
 
-async function generateImage(tweetText) {
-  const imagePrompt = `Flat lay photo of home organization products on a white background. Clean, minimal aesthetic. Items related to: "${tweetText}". Style: Pinterest home organization, bright natural light, top-down view. Products like boxes, labels, organizers, containers. No people, no faces. No text overlay. Professional product photography style.`;
+// ─── Busca nome do produto a partir do link Amazon ───────────────────────────
+async function fetchProductName(amazonUrl) {
+  try {
+    const { data } = await axios.get(amazonUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+        'Accept-Language': 'pt-BR,pt;q=0.9'
+      },
+      timeout: 10000
+    });
+
+    // Tenta extrair o título do produto
+    const titleMatch = data.match(/<title>(.*?)<\/title>/i);
+    if (titleMatch) {
+      // Remove " - Amazon.com.br" do final
+      return titleMatch[1].replace(/\s*[-|]\s*Amazon.*$/i, '').trim().substring(0, 120);
+    }
+    return null;
+  } catch (e) {
+    console.log('[openai] Não conseguiu buscar nome do produto:', e.message);
+    return null;
+  }
+}
+
+// ─── Gera post baseado em produto Amazon ─────────────────────────────────────
+async function generatePostFromProduct(amazonUrl) {
+  const productName = await fetchProductName(amazonUrl);
+
+  const productContext = productName
+    ? `Produto: "${productName}"\nLink: ${amazonUrl}`
+    : `Link do produto: ${amazonUrl}`;
+
+  const response = await client.chat.completions.create({
+    model: 'gpt-4o',
+    messages: [
+      { role: 'system', content: TAMARA_SYSTEM_PROMPT },
+      {
+        role: 'user',
+        content: `Escreva um post para X/Twitter recomendando este produto de organização de forma natural.
+
+${productContext}
+
+INSTRUÇÕES:
+- Crie uma dica de organização relacionada ao produto
+- Mencione o produto naturalmente no final
+- NÃO coloque o link no texto — ele será adicionado automaticamente
+- Máximo 400 caracteres
+- Retorne APENAS o texto do post, sem aspas, sem explicações`
+      }
+    ],
+    max_tokens: 300,
+    temperature: 0.85
+  });
+
+  const text = response.choices[0].message.content.trim();
+  const postText = text.length > 400 ? text.substring(0, 397) + '...' : text;
+
+  // Adiciona o link ao final
+  return `${postText}\n\n🔗 ${amazonUrl}`;
+}
+
+// ─── Gera imagem para o post ──────────────────────────────────────────────────
+async function generateImage(postText) {
+  const imagePrompt = `Flat lay photo of home organization products on a white background. Clean, minimal aesthetic. Items related to: "${postText}". Style: Pinterest home organization, bright natural light, top-down view. Products like boxes, labels, organizers, containers. No people, no faces. No text overlay. Professional product photography style.`;
 
   const response = await client.images.generate({
     model: 'gpt-image-1',
@@ -85,6 +149,7 @@ async function generateImage(tweetText) {
   return tmpPath;
 }
 
+// ─── Gera reply ───────────────────────────────────────────────────────────────
 const TAMARA_REPLY_PROMPT = `Você é TÂMARA CAVALCANTE. Personal Organizer especialista em mudança residencial.
 
 REGRAS DO REPLY:
@@ -120,4 +185,4 @@ async function generateReply(originalPost) {
   return text.length > 200 ? text.substring(0, 197) + '...' : text;
 }
 
-module.exports = { generatePostDraft, generateImage, generateReply };
+module.exports = { generatePostDraft, generatePostFromProduct, generateImage, generateReply };
