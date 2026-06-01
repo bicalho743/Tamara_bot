@@ -9,9 +9,18 @@ let bot;
 const ALLOWED_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
 async function startBot() {
-  bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, {
+  // Mata qualquer sessão de polling ativa antes de iniciar
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  try {
+    await fetch(`https://api.telegram.org/bot${token}/getUpdates?offset=-1&timeout=0`);
+    console.log('[Telegram] Sessão anterior encerrada');
+  } catch (e) {
+    console.log('[Telegram] Nenhuma sessão anterior encontrada');
+  }
+
+  bot = new TelegramBot(token, {
     polling: {
-      interval: 3000,
+      interval: 5000,
       autoStart: true,
       params: { timeout: 10, allowed_updates: ['message', 'callback_query'] }
     }
@@ -21,14 +30,10 @@ async function startBot() {
   bot.on('callback_query', handleCallbackQuery);
   bot.on('polling_error', (err) => {
     console.error('[Telegram] Polling error:', err.message);
-    if (err.message && err.message.includes('409')) {
-      console.log('[Telegram] Conflito 409 detectado — aguardando 15s para retry...');
-    }
   });
 
   console.log('[Telegram] Listeners registrados');
-}
-async function handleMessage(msg) {
+}async function handleMessage(msg) {
   const chatId = msg.chat.id;
   if (!isAuthorized(chatId)) return;
 
