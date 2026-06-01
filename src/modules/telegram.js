@@ -9,24 +9,17 @@ let bot;
 const ALLOWED_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
 async function startBot() {
-  bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, {
-  polling: {
-    interval: 2000,
-    autoStart: false,
-    params: { timeout: 10 }
-  }
-});
+  bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: false });
 
-await bot.deleteWebhook();
-await bot.startPolling();
+  await bot.deleteWebhook({ drop_pending_updates: true });
 
   bot.on('message', handleMessage);
   bot.on('callback_query', handleCallbackQuery);
   bot.on('polling_error', err => console.error('[Telegram] Polling error:', err.message));
 
+  await bot.startPolling();
   console.log('[Telegram] Listeners registrados');
 }
-
 function isAuthorized(chatId) {
   return String(chatId) === String(ALLOWED_CHAT_ID);
 }
