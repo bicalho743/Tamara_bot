@@ -13,7 +13,6 @@ app.get('/health', (_req, res) =>
   res.json({ status: 'ok', agent: 'LUCAS', ts: new Date().toISOString() })
 );
 
-// Temas rotativos para posts automáticos
 const TEMAS_AUTOMATICOS = [
   'juros altos no Brasil e impacto no crédito pessoal',
   'spread bancário brasileiro comparado ao mundo',
@@ -42,48 +41,36 @@ let temaIndex = 0;
 async function postAutomatico(horario) {
   const tema = TEMAS_AUTOMATICOS[temaIndex % TEMAS_AUTOMATICOS.length];
   temaIndex++;
-
   console.log(`[SCHEDULER] ${horario} — gerando post sobre: "${tema}"`);
-
   try {
     const texto = await generatePostDraft(tema);
     console.log(`[SCHEDULER] Post gerado (${texto.length} chars):\n${texto}`);
-
     const result = await postTweet(texto);
-    console.log(`[SCHEDULER] Publicado com sucesso: https://x.com/i/web/status/${result.tweetId}`);
+    console.log(`[SCHEDULER] Publicado: https://x.com/i/web/status/${result.tweetId}`);
   } catch (err) {
     console.error(`[SCHEDULER] Erro no post das ${horario}:`, err.message);
   }
 }
 
 function iniciarAgendador() {
-  // Horário de Brasília = UTC-3
-  // 8h BRT  = 11h UTC
-  // 12h BRT = 15h UTC
-  // 18h BRT = 21h UTC
-  // 21h BRT = 00h UTC (meia-noite)
-
-  cron.schedule('0 11 * * *', () => postAutomatico('08:00'), { timezone: 'America/Sao_Paulo' });
-  cron.schedule('0 15 * * *', () => postAutomatico('12:00'), { timezone: 'America/Sao_Paulo' });
-  cron.schedule('0 21 * * *', () => postAutomatico('18:00'), { timezone: 'America/Sao_Paulo' });
-  cron.schedule('0 0 * * *',  () => postAutomatico('21:00'), { timezone: 'America/Sao_Paulo' });
-
+  cron.schedule('0 8 * * *',  () => postAutomatico('08:00'), { timezone: 'America/Sao_Paulo' });
+  cron.schedule('0 12 * * *', () => postAutomatico('12:00'), { timezone: 'America/Sao_Paulo' });
+  cron.schedule('0 18 * * *', () => postAutomatico('18:00'), { timezone: 'America/Sao_Paulo' });
+  cron.schedule('0 21 * * *', () => postAutomatico('21:00'), { timezone: 'America/Sao_Paulo' });
   console.log('[SCHEDULER] Agendador ativo — posts às 8h, 12h, 18h e 21h (Brasília)');
 }
 
 async function main() {
   await initDB();
-  startBot();
+  await startBot();
   iniciarAgendador();
-
   const port = process.env.PORT || 3000;
   app.listen(port, () => {
     console.log(`[LUCAS] Servidor HTTP ativo na porta ${port}`);
-    console.log(`[LUCAS] Bot do Telegram iniciado via polling`);
   });
 }
 
 main().catch(err => {
-  console.error('[LUCAS] Falha crítica na inicialização:', err.message);
+  console.error('[LUCAS] Falha crítica:', err.message);
   process.exit(1);
 });
