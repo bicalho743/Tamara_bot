@@ -51,9 +51,13 @@ function isAuthorized(chatId) {
 
 // ─── Detecta se é link Amazon ─────────────────────────────────────────────────
 function isAmazonLink(text) {
-  return /https?:\/\/(amzn\.to|www\.amazon\.com\.br|amazon\.com\.br)/i.test(text.trim());
+  return /https?:\/\/(amzn\.to|www\.amazon\.com\.br|amazon\.com\.br)/i.test(text);
 }
 
+function extractAmazonLink(text) {
+  const match = text.match(/https?:\/\/(amzn\.to|www\.amazon\.com\.br|amazon\.com\.br)[^\s]*/i);
+  return match ? match[0] : null;
+}
 // ─── Handler principal de mensagens ──────────────────────────────────────────
 async function handleMessage(msg) {
   const chatId = msg.chat.id;
@@ -75,9 +79,9 @@ async function handleMessage(msg) {
 
   // ─── LINK AMAZON detectado ───────────────────────────────────────────────
   if (isAmazonLink(text)) {
-    return handleAmazonLink(chatId, text);
+    const link = extractAmazonLink(text);
+    return handleAmazonLink(chatId, link);
   }
-
   // Modo REPLY
   if (text.toUpperCase().startsWith('REPLY:')) {
     const originalPost = text.slice(6).trim();
