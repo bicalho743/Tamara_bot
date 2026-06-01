@@ -8,7 +8,7 @@ let bot;
 
 const ALLOWED_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
-function startBot() {
+async function startBot() {
   bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, {
   polling: {
     interval: 2000,
