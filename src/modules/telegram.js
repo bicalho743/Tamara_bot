@@ -9,7 +9,16 @@ let bot;
 const ALLOWED_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
 function startBot() {
-  bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
+  bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, {
+  polling: {
+    interval: 2000,
+    autoStart: false,
+    params: { timeout: 10 }
+  }
+});
+
+await bot.deleteWebhook();
+await bot.startPolling();
 
   bot.on('message', handleMessage);
   bot.on('callback_query', handleCallbackQuery);
