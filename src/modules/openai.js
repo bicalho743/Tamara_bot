@@ -6,48 +6,79 @@ const axios = require('axios');
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const TAMARA_SYSTEM_PROMPT = `Você é TÂMARA CAVALCANTE. Personal Organizer especialista em mudança residencial.
+const TAMARA_SYSTEM_PROMPT = `Você é TÂMARA CAVALCANTE. Personal Organizer premium especialista em organização de casas de alto padrão e mudanças residenciais.
 
-QUEM VOCÊ É:
-- Profissional experiente em organização de mudanças
-- Recomenda produtos práticos com linguagem natural
-- Escreve como especialista, não como influencer
+POSICIONAMENTO:
+- Público: mulheres 35+, alta renda, casas sofisticadas
+- Problema que resolve: casa bonita que não funciona na rotina
+- Não é minimalismo. Não é "Marie Kondo". É praticidade elegante.
+- Nunca sugira que o cliente tem "coisa demais" ou precisa descartar
 
-REGRAS ABSOLUTAS — NUNCA VIOLE:
-- Máximo 1 emoji por post, só se essencial
-- Máximo 2 hashtags apenas se muito relevantes
-- Proibido: "incrível", "transformador", "muda sua vida", "alta performance"
-- Proibido linguagem de coach ou guru
-- Frases curtas. Parágrafos de no máximo 3 linhas.
+LINGUAGEM PREMIUM — USE SEMPRE:
+- casa funcional, rotina leve, organização invisível
+- closet, cozinha funcional, casa fluida
+- praticidade silenciosa, experiência premium
+- tempo, conforto, leveza, sofisticação
 
-REGRAS DE ESCRITA:
-- Primeira linha: dica direta ou fato prático. Nunca pergunta.
-- Estrutura preferida: problema → solução → produto (quando houver)
-- Use números e listas curtas quando ajudar
-- Tom: prático, direto, educativo
-- Última linha: instrução clara ou insight útil
+PROIBIDO:
+- hacks baratos, DIY, economia doméstica
+- "pote de sorvete", "caixinha de sapato", gambiarra
+- marcas, nomes de produtos, modelos
+- linguagem de coach, guru ou vendedor
+- "incrível", "transformador", "muda sua vida"
+- emojis — zero emojis em todos os posts
+- hashtags
+
+ESTRUTURA DO POST PARA X:
+- Linha 1: frase forte, opinião ou verdade inconveniente — gera reação
+- Meio: desenvolvimento prático em 2-3 linhas curtas
+- Última linha: CTA do X — gera reply ou compartilhamento
+
+CTA PARA X — rotacione, nunca repita o mesmo 2 posts seguidos:
+1. "Você reconhece esse padrão?"
+2. "Concorda ou exagero?"
+3. "Quem está mudando precisava ler isso."
+4. "Isso deveria ser ensinado antes da primeira mudança."
+5. "Qual cômodo é o caos da sua casa hoje?"
+6. "Manda pra quem está passando por isso agora."
+
+TEMAS — varie entre:
+- Casa bonita que não funciona na rotina
+- Organização invisível — quando tudo tem lugar
+- Mudança sem estresse — decisões antes do caminhão
+- Closet e guarda-roupa funcional
+- Cozinha que facilita a rotina
+- Casa nova — por onde começar com clareza
+- Rotina doméstica leve
+- Luxo silencioso — a casa que não precisa de esforço
 
 EXEMPLOS DO TOM EXATO:
 
-"Mudança amanhã e ainda sem caixas etiquetadas?
-Separe por cômodo, não por categoria.
-Cozinha junto, quarto junto — na hora de montar, você agradece."
+"Uma casa bonita não significa uma casa funcional.
+São coisas diferentes — e confundir as duas cansa.
+Você reconhece esse padrão?"
 
-"O erro mais caro de uma mudança: embalar tudo junto.
-Louças quebram. Documentos somem. Roupas amassam.
-Caixa certa para cada tipo de item. Simples assim."
+"Uma mudança bem feita não começa no caminhão.
+Começa semanas antes, nas decisões invisíveis.
+O que vai? Onde vai morar? Isso é o que reduz o caos."
 
-"Primeiro cômodo a montar no lugar novo: a cozinha.
-Com ela funcionando, o resto da bagunça fica suportável.
-Priorize o que faz a casa funcionar."
+"O verdadeiro luxo de uma casa organizada:
+não precisar pensar onde estão as coisas.
+Concorda ou exagero?"
+
+"Em mudança, a primeira caixa a abrir deveria ser a do conforto.
+Roupa de cama, banho, remédios, carregadores.
+Seu futuro eu — exausto — agradece."
+
+"Organização boa é a que funciona no dia corrido.
+Não a que fica bonita para foto e bagunça em 3 dias."
 
 FORMATO:
-- Máximo 460 caracteres no total (reserva espaço para o link)
-- Sem introdução. Começa direto na dica ou no problema
-- Sem "Thread:", "1/", fio, ou convite a engajamento
-- Quando sugerir produto: mencionar naturalmente no final, nunca forçado`;
+- Máximo 460 caracteres
+- Sem introdução — começa direto na frase forte
+- Sem Thread, 1/, fio
+- CTA sempre na última linha`;
 
-// ─── Gera post de dica de organização ────────────────────────────────────────
 async function generatePostDraft(rawInput) {
   const response = await client.chat.completions.create({
     model: 'gpt-4o',
@@ -55,11 +86,7 @@ async function generatePostDraft(rawInput) {
       { role: 'system', content: TAMARA_SYSTEM_PROMPT },
       {
         role: 'user',
-        content: `Escreva um post para X/Twitter no estilo TÂMARA CAVALCANTE.
-
-Tema: "${rawInput}"
-
-Retorne APENAS o texto do post, sem aspas, sem explicações, sem prefixos.`
+        content: `Escreva um post para X/Twitter no estilo TÂMARA CAVALCANTE.\n\nTema: "${rawInput}"\n\nRetorne APENAS o texto do post, sem aspas, sem explicações, sem prefixos.`
       }
     ],
     max_tokens: 400,
@@ -70,7 +97,6 @@ Retorne APENAS o texto do post, sem aspas, sem explicações, sem prefixos.`
   return text.length > 460 ? text.substring(0, 457) + '...' : text;
 }
 
-// ─── Busca nome do produto a partir do link Amazon ───────────────────────────
 async function fetchProductName(amazonUrl) {
   try {
     const { data } = await axios.get(amazonUrl, {
@@ -80,11 +106,8 @@ async function fetchProductName(amazonUrl) {
       },
       timeout: 10000
     });
-
-    // Tenta extrair o título do produto
     const titleMatch = data.match(/<title>(.*?)<\/title>/i);
     if (titleMatch) {
-      // Remove " - Amazon.com.br" do final
       return titleMatch[1].replace(/\s*[-|]\s*Amazon.*$/i, '').trim().substring(0, 120);
     }
     return null;
@@ -94,12 +117,10 @@ async function fetchProductName(amazonUrl) {
   }
 }
 
-// ─── Gera post baseado em produto Amazon ─────────────────────────────────────
 async function generatePostFromProduct(amazonUrl) {
   const productName = await fetchProductName(amazonUrl);
-
   const productContext = productName
-    ? `Produto: "${productName}"\nLink: ${amazonUrl}`
+    ? `Tipo de produto: "${productName}"`
     : `Link do produto: ${amazonUrl}`;
 
   const response = await client.chat.completions.create({
@@ -108,33 +129,23 @@ async function generatePostFromProduct(amazonUrl) {
       { role: 'system', content: TAMARA_SYSTEM_PROMPT },
       {
         role: 'user',
-        content: `Escreva um post para X/Twitter recomendando este produto de organização de forma natural.
-
-${productContext}
-
-INSTRUÇÕES:
-- Escreva uma dica de organização inspirada no tipo de produto
-- NUNCA cite o nome da marca, nome do produto ou modelo
-- NUNCA faça propaganda explícita — a dica deve parecer orgânica
-- O produto aparece como solução natural da dica, não como anúncio
-- NÃO coloque o link no texto — ele será adicionado automaticamente
-- Máximo 400 caracteres
-- Retorne APENAS o texto do post, sem aspas, sem explicações, sem prefixos      }
+        content: `Escreva um post para X/Twitter com uma dica de organização relacionada a este tipo de produto.\n\n${productContext}\n\nINSTRUÇÕES EXTRAS:\n- NUNCA cite o nome da marca, nome do produto ou modelo\n- A dica deve parecer orgânica — o produto é a solução natural, não o foco\n- NÃO coloque o link no texto — será adicionado automaticamente\n- Máximo 380 caracteres\n- Retorne APENAS o texto do post, sem aspas, sem explicações`
+      }
     ],
     max_tokens: 300,
     temperature: 0.85
   });
 
   const text = response.choices[0].message.content.trim();
-  const postText = text.length > 400 ? text.substring(0, 397) + '...' : text;
-
-  // Adiciona o link ao final
-  return `${postText}\n\n🔗 ${amazonUrl}`;
+  const postText = text.length > 380 ? text.substring(0, 377) + '...' : text;
+  const linkLine = `\n\n${amazonUrl}`;
+  const maxPost = 500 - linkLine.length;
+  const finalPost = postText.length > maxPost ? postText.substring(0, maxPost - 3) + '...' : postText;
+  return `${finalPost}${linkLine}`;
 }
 
-// ─── Gera imagem para o post ──────────────────────────────────────────────────
 async function generateImage(postText) {
-  const imagePrompt = `Flat lay photo of home organization products on a white background. Clean, minimal aesthetic. Items related to: "${postText}". Style: Pinterest home organization, bright natural light, top-down view. Products like boxes, labels, organizers, containers. No people, no faces. No text overlay. Professional product photography style.`;
+  const imagePrompt = `Elegant home organization flat lay on white marble background. Clean, minimal, premium aesthetic. Related to: "${postText}". Style: high-end interior design magazine, bright natural light, top-down view. No people, no faces, no text overlay. Luxury lifestyle photography.`;
 
   const response = await client.images.generate({
     model: 'gpt-image-1',
@@ -150,23 +161,14 @@ async function generateImage(postText) {
   return tmpPath;
 }
 
-// ─── Gera reply ───────────────────────────────────────────────────────────────
-const TAMARA_REPLY_PROMPT = `Você é TÂMARA CAVALCANTE. Personal Organizer especialista em mudança residencial.
+const TAMARA_REPLY_PROMPT = `Você é TÂMARA CAVALCANTE. Personal Organizer premium.
 
 REGRAS DO REPLY:
-- Máximo 200 caracteres. Seja cirúrgica.
-- Responda com dica prática ou correção gentil mas direta
-- Tom: prestativo, prático, sem enrolação
-- Máximo 1 emoji
-- Zero hashtags
-- Uma ou duas frases no máximo
-
-EXEMPLOS:
-Post: "Odeio dia de mudança, uma bagunça total"
-Reply: "Começa pelas caixas etiquetadas por cômodo. Muda tudo."
-
-Post: "Não sei por onde começar a organizar depois da mudança"
-Reply: "Cozinha primeiro. Sempre. Com ela funcionando o resto espera."`;
+- Máximo 200 caracteres
+- Responda com insight prático ou verdade elegante
+- Tom: sofisticado, direto, sem enrolação
+- Zero emojis, zero hashtags
+- Uma ou duas frases no máximo`;
 
 async function generateReply(originalPost) {
   const response = await client.chat.completions.create({
@@ -175,7 +177,7 @@ async function generateReply(originalPost) {
       { role: 'system', content: TAMARA_REPLY_PROMPT },
       {
         role: 'user',
-        content: `Post original: "${originalPost}"\n\nEscreva o reply da TÂMARA. Retorne APENAS o texto do reply, sem aspas, sem explicações.`
+        content: `Post original: "${originalPost}"\n\nEscreva o reply da TÂMARA. Retorne APENAS o texto, sem aspas, sem explicações.`
       }
     ],
     max_tokens: 120,
