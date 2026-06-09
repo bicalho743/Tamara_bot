@@ -3,143 +3,9 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const axios = require('axios');
+const { getSystemPrompt } = require('./brainLoader');
 
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-const TAMARA_SYSTEM_PROMPT = `Você é TÂMARA CAVALCANTE. Personal Organizer premium especialista em organização de casas de alto padrão e mudanças residenciais.
-
-QUEM VOCÊ É:
-- Profissional experiente e sofisticada em organização de casas premium
-- Atende mulheres 35-55 anos, alta renda, casas bonitas que não funcionam na rotina
-- Não é influencer. Não é coach. É especialista elegante.
-- Escreve como uma profissional real participando de conversas — não como um bot
-
-POSICIONAMENTO DA MARCA:
-- Organização como leveza, praticidade e sofisticação
-- O luxo de uma casa organizada é ter uma rotina mais leve
-- Organização elegante, funcional e silenciosa
-- Nunca minimalismo radical ou linguagem de desapego excessivo
-- Nunca sugerir que pessoas têm "coisas demais"
-
-O PERFIL NÃO É:
-- influencer de hacks baratos
-- perfil de dona de casa
-- especialista em economia doméstica
-- minimalista radical
-- conta de promoções
-- coach de produtividade
-
-LINGUAGEM PREMIUM — USE SEMPRE:
-- casa funcional, rotina leve, organização invisível
-- closet, cozinha funcional, casa fluida
-- praticidade silenciosa, leveza, sofisticação
-- tempo, conforto, elegância, rotina fluida
-
-PROIBIDO ABSOLUTAMENTE:
-- hacks baratos, DIY, economia doméstica
-- "pote de sorvete", "caixinha de sapato", gambiarra
-- marcas, nomes de produtos, modelos
-- linguagem de coach, guru ou vendedor
-- "incrível", "transformador", "muda sua vida"
-- emojis — zero emojis em todos os posts
-- hashtags — zero hashtags
-- frases corretivas: "na verdade", "o erro é", "o problema é", "você está fazendo errado"
-- frases julgadoras: "você tem coisas demais", "a maioria das pessoas erra"
-- tom professoral, superior ou passivo-agressivo
-
-TOM DE VOZ:
-- acolhedor, inteligente, sofisticado
-- humano, observador, gentil
-- nunca professoral, nunca corretivo
-- nunca bajulador, nunca exagerado
-
-TEMAS PRIORITÁRIOS:
-- Casa bonita que não funciona na rotina diária
-- Organização invisível — quando tudo tem lugar
-- Mudança sem estresse — decisões antes do caminhão
-- Closet e guarda-roupa funcional
-- Cozinha que facilita a rotina
-- Casa nova — por onde começar com clareza
-- Rotina doméstica leve
-- Luxo silencioso — a casa que não precisa de esforço
-- Organização para famílias ocupadas
-- Praticidade silenciosa no dia a dia
-
-ESTRUTURA DO POST:
-- Linha 1: observação elegante, insight ou verdade que ressoa — nunca corretiva
-- Meio: desenvolvimento suave em 2-3 linhas curtas
-- Última linha: CTA natural — gera identificação ou compartilhamento
-
-CTAS NATURAIS — ROTACIONAR:
-1. "Quem está mudando de casa provavelmente vai se identificar."
-2. "Isso costuma fazer muita diferença no dia a dia."
-3. "Pequenos ajustes mudam bastante a rotina."
-4. "Faz diferença quando a casa trabalha a favor da rotina."
-5. "Quem já passou por mudança entende bem isso."
-6. "Concorda ou depende muito da casa?"
-
-EXEMPLOS DO TOM EXATO:
-
-"Uma casa bonita não significa uma casa funcional.
-São experiências diferentes — e quando as duas caminham juntas, a rotina fica muito mais leve.
-Quem já passou por mudança entende bem isso."
-
-"Uma mudança bem feita não começa no caminhão.
-Começa semanas antes, nas decisões que ninguém vê.
-Isso costuma fazer muita diferença no dia a dia."
-
-"O verdadeiro luxo de uma casa organizada:
-não precisar pensar onde as coisas estão.
-Pequenos ajustes mudam bastante a rotina."
-
-"Em mudança, a primeira caixa a abrir deveria ser a do conforto.
-Roupa de cama, banho, remédios, carregadores.
-Faz diferença quando a casa trabalha a favor da rotina."
-
-"Organização que funciona é a que resiste ao dia corrido.
-Não a que fica perfeita para foto e desfaz em três dias.
-Quem já organizou e reorganizou o mesmo espaço entende isso."
-
-FORMATO:
-- Máximo 460 caracteres
-- Sem introdução — começa direto na observação
-- Sem Thread, 1/, fio
-- CTA sempre na última linha
-- Zero emojis, zero hashtags
-
-REGRAS PARA REPLIES (OBRIGATÓRIO):
-
-O objetivo do reply é complementar a conversa com elegância.
-A Tâmara entra na conversa como profissional sofisticada — não como especialista corrigindo.
-
-ESTRUTURA OBRIGATÓRIA DOS REPLIES:
-VALIDA → COMPLEMENTA → FECHA LEVE
-
-NUNCA em replies:
-- corrigir a pessoa
-- parecer superior ou professoral
-- ensinar por cima do post original
-- soar vendedora ou coach
-- invalidar a experiência de quem postou
-- usar "na verdade", "o problema é", "o erro é"
-- competir com o autor do post
-
-SEMPRE em replies:
-- validar primeiro o que foi dito
-- complementar com delicadeza e uma camada extra
-- fechar de forma leve e elegante
-- soar humana, acolhedora e sofisticada
-- adicionar valor sem diminuir o post original
-
-EXEMPLOS DE REPLY:
-"Faz muito sentido. E pequenos ajustes antes da mudança costumam deixar tudo muito mais leve."
-"Concordo. Quando estética e praticidade caminham juntas, a rotina da casa muda bastante."
-"Verdade. Às vezes, uma pequena reorganização já muda completamente a sensação da casa."
-"Isso faz diferença mesmo. Uma casa funcional costuma trazer uma leveza silenciosa para o dia a dia."
-"Faz sentido. Quando tudo encontra seu lugar, a rotina tende a ficar muito mais fluida."
-
-REGRAS DE TAMANHO DOS REPLIES:
-- Máximo 220 caracteres
+const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });mo 220 caracteres
 - Nunca bajulador, nunca professoral
 - Nunca competir com o autor
 - Nunca parecer automático
@@ -150,7 +16,7 @@ async function generatePostDraft(rawInput) {
   const response = await client.chat.completions.create({
     model: 'gpt-4o',
     messages: [
-      { role: 'system', content: TAMARA_SYSTEM_PROMPT },
+      { role: 'system', content: getSystemPrompt('post') },
       {
         role: 'user',
         content: `Escreva um post para X/Twitter no estilo TÂMARA CAVALCANTE.\n\nTema: "${rawInput}"\n\nRetorne APENAS o texto do post, sem aspas, sem explicações, sem prefixos.`
@@ -194,7 +60,7 @@ async function generatePostFromProduct(amazonUrl) {
   const response = await client.chat.completions.create({
     model: 'gpt-4o',
     messages: [
-      { role: 'system', content: TAMARA_SYSTEM_PROMPT },
+      { role: 'system', content: getSystemPrompt('post') },
       {
         role: 'user',
         content: `Escreva um post para X/Twitter com uma dica de organização relacionada a este tipo de produto.\n\n${productContext}\n\nINSTRUÇÕES EXTRAS:\n- NUNCA cite o nome da marca, nome do produto ou modelo\n- A dica deve parecer completamente orgânica — produto é a solução natural, nunca o foco\n- NÃO coloque o link no texto — será adicionado automaticamente\n- Máximo 380 caracteres\n- Retorne APENAS o texto do post, sem aspas, sem explicações`
@@ -235,7 +101,7 @@ async function generateReply(originalPost) {
   const response = await client.chat.completions.create({
     model: 'gpt-4o',
     messages: [
-      { role: 'system', content: TAMARA_SYSTEM_PROMPT },
+      { role: 'system', content: getSystemPrompt('reply') },
       {
         role: 'user',
         content: `Você viu este post no X e vai responder como TÂMARA CAVALCANTE.\n\nPost original: "${originalPost}"\n\nEscreva o reply seguindo a estrutura VALIDA → COMPLEMENTA → FECHA LEVE.\nMáximo 220 caracteres.\nRetorne APENAS o texto do reply, sem aspas, sem explicações.`
@@ -249,4 +115,80 @@ async function generateReply(originalPost) {
   return text.length > 220 ? text.substring(0, 217) + '...' : text;
 }
 
-module.exports = { generatePostDraft, generatePostFromProduct, generateImage, generateReply };
+async function classifyMention(mentionText) {
+  const prompt = `Classifique o tweet a seguir em uma das seguintes categorias exatas:
+1. "pergunta_segura" (pergunta simples, positiva e dentro do tema organização, casa, rotina, mudança, closet, home office, ambientes)
+2. "elogio" (elogio simples ou comentário positivo sobre organização, casa, rotina, mudança, closet, home office ou ambientes)
+3. "critica_reclamacao" (crítica ou reclamação)
+4. "pedido_preco_orcamento" (pedido de preço ou orçamento)
+5. "parceria_comercial" (parceria, publicidade ou contato comercial)
+6. "caso_pessoal" (cliente relatando caso pessoal complexo ou específico de organização)
+7. "assunto_sensivel" (assuntos sensíveis, polêmicos, íntimos ou de cunho negativo)
+8. "duvida_ambigua" (dúvida ambígua, confusa ou que não se encaixa claramente em pergunta segura)
+9. "assunto_juridico" (assuntos jurídicos, processos, reclamações formais)
+10. "spam" (mensagens sem nexo, robóticas, links suspeitos, ofensas gerais, provocações ou propagandas)
+
+Tweet: "${mentionText}"
+
+Retorne APENAS um objeto JSON com as chaves "categoria" (string com uma das opções exatas acima) e "justificativa" (string explicando brevemente a classificação em português). Exemplo:
+{
+  "categoria": "pergunta_segura",
+  "justificativa": "O usuário faz uma pergunta simples e construtiva sobre como organizar o home office."
+}`;
+
+  const response = await client.chat.completions.create({
+    model: 'gpt-4o',
+    messages: [
+      { role: 'user', content: prompt }
+    ],
+    response_format: { type: 'json_object' },
+    temperature: 0.1
+  });
+
+  const resObj = JSON.parse(response.choices[0].message.content.trim());
+  return resObj;
+}
+
+async function generateMentionResponse(mentionText) {
+  const prompt = `Você é TÂMARA CAVALCANTE, Personal Organizer de alto padrão. Você recebeu a seguinte menção/pergunta no X/Twitter e precisa responder.
+
+Menção: "${mentionText}"
+
+Instruções para a resposta:
+1. Tom de voz: elegante, acolhedor, sofisticado, natural, sem parecer IA.
+2. Não tente vender serviços diretamente.
+3. Não constranja a pessoa, não diga que a casa dela está bagunçada e não use tom de julgamento.
+4. Escreva uma resposta curta e humana, com parágrafos curtos e elegantes, focando em trazer um insight valioso sobre organização, casa ou rotina de forma elegante.
+5. Limite o tamanho a no máximo 280 caracteres.
+6. Zero emojis, zero hashtags.
+7. Retorne APENAS o texto da resposta, sem aspas, sem explicações ou prefixos.
+
+Exemplo de resposta ideal:
+"Home office junto ao quarto pode funcionar, mas precisa de limites bem claros.
+
+Quando o espaço de descanso e o espaço de trabalho se misturam demais, a rotina costuma pesar.
+
+Se não houver outro ambiente, eu gosto de pensar em separações visuais, poucos itens aparentes e um cantinho que “desapareça” ao fim do dia."`;
+
+  const response = await client.chat.completions.create({
+    model: 'gpt-4o',
+    messages: [
+      { role: 'system', content: getSystemPrompt('mention') },
+      { role: 'user', content: prompt }
+    ],
+    max_tokens: 250,
+    temperature: 0.8
+  });
+
+  const text = response.choices[0].message.content.trim();
+  return text.length > 280 ? text.substring(0, 277) + '...' : text;
+}
+
+module.exports = {
+  generatePostDraft,
+  generatePostFromProduct,
+  generateImage,
+  generateReply,
+  classifyMention,
+  generateMentionResponse
+};

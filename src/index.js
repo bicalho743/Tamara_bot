@@ -5,6 +5,7 @@ const { startBot, notificarTelegram, enviarParaAprovacao } = require('./modules/
 const { initDB } = require('./modules/db');
 const { generatePostDraft } = require('./modules/openai');
 const { postTweet } = require('./modules/twitter');
+const { processarMencoes } = require('./modules/mentions');
 
 const app = express();
 app.use(express.json());
@@ -131,13 +132,21 @@ function iniciarAgendador() {
     setTimeout(() => postComAprovacao('20h-22h'), delay);
   }, { timezone: 'America/Sao_Paulo' });
 
-  console.log('[SCHEDULER] Agendador ativo — janelas: 8-9h / 12-13h / 17-19h / 20-22h (Brasília)');
+  // Verificação de menções a cada 5 minutos
+  cron.schedule('*/5 * * * *', () => {
+    processarMencoes();
+  });
+
+  console.log('[SCHEDULER] Agendador ativo — janelas: 8-9h / 12-13h / 17-19h / 20-22h (Brasília) e Monitor de menções (a cada 5 min)');
 }
 
 async function main() {
   await initDB();
   await startBot();
   iniciarAgendador();
+
+  // Executa uma vez ao iniciar para processar menções recebidas offline
+  processarMencoes();
 
   const port = process.env.PORT || 3000;
   app.listen(port, () => {

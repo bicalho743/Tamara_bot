@@ -1,7 +1,7 @@
 const TelegramBot = require('node-telegram-bot-api');
 const { v4: uuidv4 } = require('uuid');
 const { generatePostDraft, generatePostFromProduct, generateImage, generateReply } = require('./openai');
-const { saveDraft, getDraft, setSession, getSession, clearSession, markPosted } = require('./db');
+const { saveDraft, getDraft, updateDraft, setSession, getSession, clearSession, markPosted, markMentionResponded } = require('./db');
 const { postTweet } = require('./twitter');
 
 let bot;
@@ -95,6 +95,9 @@ async function handleMessage(msg) {
   if (session?.state === 'editing') {
     return handleEdit(chatId, text, session.currentDraftId);
   }
+  if (session?.state === 'editing_mention_reply') {
+    return handleMentionEdit(chatId, text, session.currentDraftId);
+  }
 
   if (isAmazonLink(text)) {
     const link = extractAmazonLink(text);
@@ -179,6 +182,25 @@ async function handleCallbackQuery(query) {
     const { descartarPost } = require('../index');
     const ok = await descartarPost(id);
     await bot.sendMessage(chatId, ok ? '🗑️ Post descartado.' : '⚠️ Post não encontrado ou já expirou.');
+    return;
+  }
+
+  if (data.startsWith('mention_approve:')) {
+    const id = data.split(':')[1];
+    await handleMentionApprove(chatId, id, query.message.message_id);
+    return;
+  }
+
+  if (data.startsWith('mention_ignore:')) {
+    const id = data.split(':')[1];
+    await handleMentionIgnore(chatId, id, query.message.message_id);
+    return;
+  }
+
+  if (data.startsWith('mention_edit:')) {
+    const id = data.split(':')[1];
+    setSession(chatId, { state: 'editing_mention_reply', currentDraftId: id });
+    await bot.sendMessage(chatId, '✏️ Envie o texto editado para a resposta:');
     return;
   }
 
@@ -317,4 +339,139 @@ async function sendStatus(chatId) {
   await bot.sendMessage(chatId, `Estado: \`${state}\``, { parse_mode: 'Markdown' });
 }
 
-module.exports = { startBot, notificarTelegram, enviarParaAprovacao };
+async function enviarMentaoParaAprovacao(draftId, text, authorUsername, respostaSugerida, categoria, justificativa) {
+  if (!bot || !ALLOWED_CHAT_ID) return;
+  try {
+    const formatMap = {
+      critica_reclamacao: '⚠️ Crítica/Reclamação',
+      pedido_preco_orcamento: '💰 Pedido de Orçamento/Preço',
+      caso_pessoal: '👤 Caso Pessoal de Cliente',
+      parceria_comercial: '🤝 Parceria/Comercial',
+      assunto_juridico: '⚖️ Assunto Jurídico',
+      assunto_sensivel: '🚨 Assunto Sensível',
+      duvida_ambigua: '❓ Dúvida Ambígua'
+    };
+    const catLabel = formatMap[categoria] || categoria;
+
+    await bot.sendMessage(
+      ALLOWED_CHAT_ID,
+      `📥 *NOVA MENÇÃO PENDENTE* (Classe: ${catLabel})\n\n` +
+      `*De:* @${authorUsername}\n` +
+      `*Mensagem:* "${text}"\n\n` +
+      `*Sugestão de resposta da Tâmara:*\n` +
+      `"${respostaSugerida}"\n\n` +
+      `_Justificativa AI:_ ${justificativa}`,
+      {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: '✅ Aprovar e Responder', callback_data: `mention_approve:${draftId}` },
+              { text: '✏️ Editar', callback_data: `mention_edit:${draftId}` }
+            ],
+            [
+              { text: '❌ Ignorar / Não Responder', callback_data: `mention_ignore:${draftId}` }
+            ]
+          ]
+        }
+      }
+    );
+  } catch (e) {
+    console.error('[Telegram] Erro ao enviar menção para aprovação:', e.message);
+  }
+}
+
+async function handleMentionApprove(chatId, draftId, messageId) {
+  const draft = getDraft(draftId);
+  if (!draft) return bot.sendMessage(chatId, '⚠️ Resposta de menção não encontrada ou já expirou.');
+
+  await bot.sendMessage(chatId, '🐦 Postando resposta no X...');
+  try {
+    const result = await postTweet(draft.text, null, draft.mentionId);
+    
+    markMentionResponded(draft.mentionId);
+    clearSession(chatId);
+
+    await bot.editMessageText(
+      `✅ *Respondido no X!*\n\n` +
+      `*De:* @${draft.mentionAuthor}\n` +
+      `*Mensagem:* "${draft.mentionText}"\n\n` +
+      `*Resposta enviada:*\n` +
+      `"${draft.text}"\n\n` +
+      `https://x.com/i/web/status/${result.tweetId}`,
+      {
+        chat_id: chatId,
+        message_id: messageId,
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: [] }
+      }
+    );
+  } catch (err) {
+    await bot.sendMessage(chatId, `❌ Erro ao postar resposta: ${err.message}`);
+  }
+}
+
+async function handleMentionIgnore(chatId, draftId, messageId) {
+  const draft = getDraft(draftId);
+  if (!draft) return bot.sendMessage(chatId, '⚠️ Resposta de menção não encontrada.');
+
+  markMentionResponded(draft.mentionId);
+  clearSession(chatId);
+
+  await bot.editMessageText(
+    `🗑️ *Menção ignorada.*\n\n` +
+    `*De:* @${draft.mentionAuthor}\n` +
+    `*Mensagem:* "${draft.mentionText}"`,
+    {
+      chat_id: chatId,
+      message_id: messageId,
+      parse_mode: 'Markdown',
+      reply_markup: { inline_keyboard: [] }
+    }
+  );
+}
+
+async function handleMentionEdit(chatId, newText, draftId) {
+  const draft = getDraft(draftId);
+  if (!draft) return bot.sendMessage(chatId, '⚠️ Rascunho não encontrado.');
+
+  const updatedDraft = updateDraft(draftId, { text: newText });
+  setSession(chatId, { state: 'awaiting_mention_action', currentDraftId: draftId });
+
+  const formatMap = {
+    critica_reclamacao: '⚠️ Crítica/Reclamação',
+    pedido_preco_orcamento: '💰 Pedido de Orçamento/Preço',
+    caso_pessoal: '👤 Caso Pessoal de Cliente',
+    parceria_comercial: '🤝 Parceria/Comercial',
+    assunto_juridico: '⚖️ Assunto Jurídico',
+    assunto_sensivel: '🚨 Assunto Sensível',
+    duvida_ambigua: '❓ Dúvida Ambígua'
+  };
+  const catLabel = formatMap[updatedDraft.categoria] || updatedDraft.categoria;
+
+  await bot.sendMessage(
+    chatId,
+    `✏️ *RESPOSTA EDITADA* (Classe: ${catLabel})\n\n` +
+    `*De:* @${updatedDraft.mentionAuthor}\n` +
+    `*Mensagem:* "${updatedDraft.mentionText}"\n\n` +
+    `*Sugestão editada da Tâmara:*\n` +
+    `"${updatedDraft.text}"\n\n` +
+    `_(${updatedDraft.text.length} chars)_`,
+    {
+      parse_mode: 'Markdown',
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: '✅ Aprovar e Responder', callback_data: `mention_approve:${draftId}` },
+            { text: '✏️ Editar novamente', callback_data: `mention_edit:${draftId}` }
+          ],
+          [
+            { text: '❌ Ignorar / Não Responder', callback_data: `mention_ignore:${draftId}` }
+          ]
+        ]
+      }
+    }
+  );
+}
+
+module.exports = { startBot, notificarTelegram, enviarParaAprovacao, enviarMentaoParaAprovacao };

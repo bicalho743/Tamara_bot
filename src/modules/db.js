@@ -6,7 +6,9 @@ const DB_PATH = path.join(__dirname, '../../data/db.json');
 const DEFAULT_DB = {
   sessions: {},
   drafts: [],
-  posted: []
+  posted: [],
+  respondedMentions: [],
+  lastMentionId: null
 };
 
 let _db = null;
@@ -60,10 +62,56 @@ function getDraft(id) {
   return _db.drafts.find(d => d.id === id) || null;
 }
 
+function updateDraft(draftId, updates) {
+  const draft = _db.drafts.find(d => d.id === draftId);
+  if (!draft) return null;
+  Object.assign(draft, updates);
+  save();
+  return draft;
+}
+
 function markPosted(draft, tweetId) {
   _db.posted.push({ ...draft, tweetId, postedAt: new Date().toISOString() });
   if (_db.posted.length > 200) _db.posted = _db.posted.slice(-200);
   save();
 }
 
-module.exports = { initDB, getSession, setSession, clearSession, saveDraft, getDraft, markPosted };
+function isMentionResponded(mentionId) {
+  if (!_db.respondedMentions) _db.respondedMentions = [];
+  return _db.respondedMentions.includes(mentionId);
+}
+
+function markMentionResponded(mentionId) {
+  if (!_db.respondedMentions) _db.respondedMentions = [];
+  if (!_db.respondedMentions.includes(mentionId)) {
+    _db.respondedMentions.push(mentionId);
+    if (_db.respondedMentions.length > 1000) {
+      _db.respondedMentions = _db.respondedMentions.slice(-1000);
+    }
+    save();
+  }
+}
+
+function getLastMentionId() {
+  return _db.lastMentionId || null;
+}
+
+function setLastMentionId(id) {
+  _db.lastMentionId = id;
+  save();
+}
+
+module.exports = {
+  initDB,
+  getSession,
+  setSession,
+  clearSession,
+  saveDraft,
+  getDraft,
+  updateDraft,
+  markPosted,
+  isMentionResponded,
+  markMentionResponded,
+  getLastMentionId,
+  setLastMentionId
+};
